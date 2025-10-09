@@ -1,5 +1,5 @@
-TARGET = thread-example
-SRCS = thread.c
+TARGET = thread-example-2
+SRCS = 1-2.c
 
 CC=gcc
 RM=rm
