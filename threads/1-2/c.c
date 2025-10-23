@@ -14,7 +14,6 @@ void* mythread(void* arg) {
 }
 
 int main(void) {
-    
     pthread_t tid;
     if (pthread_create(&tid, NULL, mythread, NULL) != 0) {
         perror("pthread_create");

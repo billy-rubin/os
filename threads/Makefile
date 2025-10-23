@@ -1,9 +1,9 @@
 TARGET = thread-example-2
-SRCS = 1-2/e.c
+SRCS = 1-2/f.c
 
 CC=gcc
 RM=rm
-CFLAGS= -g -Wall
+CFLAGS= -g -Wall -fsanitize=address
 LIBS=-lpthread
 INCLUDE_DIR="."
 

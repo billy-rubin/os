@@ -11,8 +11,7 @@ void* mythread(void* arg) {
     printf("mythread [%d %d %d %ld]: Hello from mythread!\n", getpid(), getppid(), gettid(), pthread_self());    
    int *result = malloc(sizeof(int));
     *result = 42;
-    return result;
-   
+    return result; 
 }
 
 int main(void) {

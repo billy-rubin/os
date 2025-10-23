@@ -14,15 +14,15 @@ void* mythread(void* arg) {
 }
 
 int main(void) {
-   
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
     
-
     while (1) {
         pthread_t tid;
         pthread_create(&tid, NULL, mythread, NULL);
+        int f = pthread_join(tid, NULL);
+        printf("AAAAAAAAAAAA %d\n",f);
         usleep(1000);
     }
     pthread_attr_destroy(&attr);

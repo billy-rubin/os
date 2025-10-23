@@ -25,7 +25,11 @@ int main() {
     struct MyStruct st = {digit, c};
     pthread_t tid;
 
-    pthread_create(&tid, NULL, mythread, &st);
+    int err = pthread_create(&tid, NULL, mythread, &st);
+    if (err) {
+        printf("main: pthread_create() failed: %s\n", strerror(err));
+        return -1;
+    }
     pthread_join(tid, NULL);
     
     return 0;

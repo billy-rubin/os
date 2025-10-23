@@ -8,7 +8,6 @@
 #include <stdlib.h>
 
 void* mythread(void* arg) {
-    
     printf("mythread [%d %d %d %ld]: Hello from mythread!\n", getpid(), getppid(), gettid(), pthread_self());
     return NULL;
 

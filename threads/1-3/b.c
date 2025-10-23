@@ -21,17 +21,33 @@ void* mythread(struct MyStruct* arg) {
 int main() {
     pthread_t tid;
     MyStruct *st = malloc(sizeof(MyStruct));
+    int err;
     st->x = 10;
     st->symb = "a";
 
     pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    err = pthread_attr_init(&attr);
 
-    pthread_create(&tid, &attr, mythread, st);
+    if (err) {
+        printf("");
+        return -1;
+    }
+    
+    err = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+
+    if (err) {
+        printf("");
+        return -1;
+    }
+
+    int err = pthread_create(&tid, &attr, mythread, st);
+    if (err) {
+        printf("main: pthread_create() failed: %s\n", strerror(err));
+        return -1;
+    }
     pthread_attr_destroy(&attr);
 
-    sleep(1);
+    sleep(5);
 
     free(st);
     return 0;
