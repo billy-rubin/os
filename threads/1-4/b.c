@@ -7,12 +7,13 @@
 
 
 void *my_thread(void *arg) {
+    pthread_detach(pthread_self());
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
     int i = 0;
     while (1) {
         i++;
     }
-    printf("my_thread: loop finished, i=%d", i);
+    printf("my_thread: loop finished, i=%d\n", i);
     return NULL;
 }
 
@@ -30,16 +31,18 @@ int main(void) {
         perror("pthread_cancel");
     }
 
-    void* res;
+    // void* res;
 
-    if (pthread_join(t, &res) != 0) {
-        perror("pthread_join");
-    }
+    // // if (pthread_join(t, &res) != 0) {
+    // //     perror("pthread_join");
+    // // }
 
-    if (res == PTHREAD_CANCELED) {
-        printf("Main: thread was canceled (PTHREAD_CANCELED)\n");
-    }
+    // if (res == PTHREAD_CANCELED) {
+    //     printf("Main: thread was canceled (PTHREAD_CANCELED)\n");
+    // }
+
+    // free(res);
 
     printf("Main done\n");
-    return 0;
+    pthread_exit(0);
 }

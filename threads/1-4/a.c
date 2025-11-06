@@ -7,7 +7,7 @@
 void *my_thread(void *arg) {
     int i = 0;
     while(1) {
-        printf("my_thread: iteration %d", i);
+        printf("my_thread: iteration %d\n", i);
         i++;
         sleep(1);
     }
@@ -22,7 +22,7 @@ int main(void) {
     }
 
     sleep(3);
-    printf("main: cancel");
+    printf("main: cancel\n");
     if (pthread_cancel(t) != 0) {
         perror("pthread_cancel");
         return 1;
@@ -35,9 +35,9 @@ int main(void) {
     }
 
     if (res == PTHREAD_CANCELED) {
-        printf("main: thread was canceled (PTHREAD_CANCELED)");
+        printf("main: thread was canceled (PTHREAD_CANCELED)\n");
     } else {
-        printf("main: thread returned %p", res);
+        printf("main: thread returned %p\n", res);
     }
     return 0;
 }

@@ -20,7 +20,6 @@ void* my_thread(void* arg) {
     }
     
     pthread_cleanup_pop(0);
-    return NULL;
 }
 
 int main() {

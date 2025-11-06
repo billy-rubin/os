@@ -12,10 +12,12 @@ typedef struct MyStruct {
     char *symb;
 }MyStruct;
 
-void* mythread(struct MyStruct* arg) {
+void* mythread(void* arg) {
+    MyStruct *s = (MyStruct*)arg;
     printf("mythread [%d %d %d %ld]: Hello from mythread!\n", getpid(), getppid(), gettid(), pthread_self());
-    printf("Int: %d \t Char: %s\n", arg->x, arg->symb);
-    return NULL;
+    printf("Int: %d \t Char: %s\n", s->x, s->symb);
+    free(arg);
+    pthread_exit(0);
 }
 
 int main() {
@@ -28,27 +30,27 @@ int main() {
     pthread_attr_t attr;
     err = pthread_attr_init(&attr);
 
-    if (err) {
-        printf("");
+    if (err != 0) {
+        printf("err initializing attr");
         return -1;
     }
     
     err = pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
 
-    if (err) {
-        printf("");
+    if (err != 0) {
+        printf("error attr wasn't set to detached");
         return -1;
     }
 
-    int err = pthread_create(&tid, &attr, mythread, st);
-    if (err) {
+    err = pthread_create(&tid, &attr, mythread, st);
+    if (err != 0) {
         printf("main: pthread_create() failed: %s\n", strerror(err));
         return -1;
     }
-    pthread_attr_destroy(&attr);
 
-    sleep(5);
-
-    free(st);
-    return 0;
+    if (pthread_attr_destroy(&attr) != 0) {
+        printf("error attr didn't destroy");
+        return -1;
+    }
+    pthread_exit(0);
 }

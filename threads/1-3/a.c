@@ -1,36 +1,57 @@
 #define _GNU_SOURCE
 #include <stdio.h>
-#include <pthread.h>
-#include <string.h>
-#include <errno.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <sys/syscall.h>
 
 typedef struct MyStruct {
     int x;
     char *symb;
-}MyStruct;
+} MyStruct;
 
-void* mythread(struct MyStruct* arg) {
-    printf("mythread [%d %d %d %ld]: Hello from mythread!\n", getpid(), getppid(), gettid(), pthread_self());
-    printf("Int: %d \t Char: %s\n", arg->x, arg->symb);
-    return NULL;
+static pid_t gettid_syscall(void) { return (pid_t)syscall(SYS_gettid); }
+
+void* mythread(void* arg) {
+    int a = 5;
+    MyStruct *s = (MyStruct*)arg;
+    printf("mythread [%d %d %d %lu]: Hello from mythread!\n",
+           getpid(), getppid(), gettid_syscall(), (unsigned long)pthread_self());
+    s->symb = "b";
+    printf("MYTHREAD Int: %d \t Char: %s\n", s->x, s->symb);
+
+    int *res = malloc(sizeof(int));
+    if (!res) {
+        perror("malloc");
+        pthread_exit(NULL);
+    }
+    *res = a;
+    pthread_exit(res);
 }
 
-int main() {
-    int digit = 10;
-    char a = 'a';
-    char* c = &a;
-    struct MyStruct st = {digit, c};
+int main(void) {
+    MyStruct st = { 42, "a" };
     pthread_t tid;
 
-    int err = pthread_create(&tid, NULL, mythread, &st);
-    if (err) {
-        printf("main: pthread_create() failed: %s\n", strerror(err));
-        return -1;
+    if (pthread_create(&tid, NULL, mythread, &st) != 0) {
+        perror("pthread_create");
+        return 1;
     }
-    pthread_join(tid, NULL);
-    
+
+    void *retval;
+    if (pthread_join(tid, &retval) != 0) {
+        perror("pthread_join");
+        return 1;
+    }
+
+    if (retval != NULL) {
+        int got = *(int*)retval;
+        printf("main: got value = %d\n", got);
+        free(retval);
+    } else {
+        printf("main: thread returned NULL\n");
+    }
+
     return 0;
 }
