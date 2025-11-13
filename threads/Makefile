@@ -1,5 +1,5 @@
 TARGET = thread-example-5
-SRCS = 1-5/a.c
+SRCS = 1-5/b.c
 
 CC=gcc
 RM=rm

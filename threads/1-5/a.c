@@ -18,17 +18,24 @@ void *BlockingThread(void *arg) {
     sigset_t set;
     sigfillset(&set);
     pthread_sigmask(SIG_BLOCK, &set, NULL);
+    signal(SIGINT, sigint_handler);
+
     while (1) {
         sleep(1);
+        if (isSigintReceived) {
+            isSigintReceived = 0;
+            printf("Received SIGINT in BLOCKING THREAD signal\n");
+        }
     }
     return NULL;
 }
 
 void *SigIntWaiter(void *arg) {
     signal(SIGINT, sigint_handler);
-    while (1) {
+    while (isSigintReceived) {
         if (isSigintReceived) {
             isSigintReceived = 0;
+            printf("Received SIGINT signal\n");
         }
     }
     return NULL;
@@ -74,13 +81,16 @@ int main() {
     }
 
     while (1) {
-        //printf("Sending SIGINT to SigIntWaiter...\n");
-        //pthread_kill(tid2, SIGINT);
+        printf("Sending SIGINT to SigIntWaiter...\n");
+        pthread_kill(tid2, SIGINT);
         
         sleep(2);
 
         printf("Sending SIGQUIT to SigQuitWaiter...\n");
         pthread_kill(tid3, SIGQUIT);
+
+        printf("Sending SIGINT to Blockingthread...\n");
+        pthread_kill(tid1, SIGINT);
         
         sleep(2);
     }

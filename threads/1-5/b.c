@@ -32,19 +32,25 @@ void *BlockingThread(void *arg) {
 
 void *SigIntWaiter(void *arg) {
     signal(SIGINT, sigint_handler);
+    printf("WAITING FOR SIGINT\n");
     while (1) {
+        sleep(1);
         if (isSigintReceived) {
             isSigintReceived = 0;
+            printf("PROCESSED SIGINT\n");
         }
     }
     return NULL;
 }
 
 void *SigQuitWaiter(void *arg) {
+    sleep(1);
+    printf("WAINTING FOR SIGQUIT\n");
     signal(SIGQUIT, sigquit_handler);
     while (1) {
         if (isSigQuitReceived) {
             isSigQuitReceived = 0;
+            printf("PROCESSED SIGQUIT\n");
         }
     }
     return NULL;

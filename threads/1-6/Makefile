@@ -4,7 +4,7 @@ OBJS         = $(SRCS:.c=.o)
 
 CC           = gcc
 RM           = rm -f
-CFLAGS       = -g -Wall -Wextra -std=gnu11 -D_GNU_SOURCE -fsanitize=address
+CFLAGS       = -g -Wall -Wextra -std=gnu11 -fsanitize=address
 LDFLAGS      = -fsanitize=address
 LIBS         = -lpthread
 INCLUDE_DIR  = .
