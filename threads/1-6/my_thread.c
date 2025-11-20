@@ -69,6 +69,7 @@ static int start_routine_wrapper(void *arg){
 
     atomic_store((_Atomic int*)&t->isFinished, 1);
     syscall(SYS_exit, 0);
+    return 0;
 }
 
 int mythread_create(mythread_t thread, void *(*start_routine)(void*), void *arg) {

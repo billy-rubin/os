@@ -71,8 +71,7 @@ void* worker_deferred(void *arg) {
     printf("[deferred] thread started\n");
 
     for (;;) {
-        for (int i = 0; i < 100000000; ++i) {
-        }
+        sleep(5);
         mythread_testcancel();
     }
 
@@ -89,6 +88,7 @@ void* worker_async(void *arg) {
     printf("[async] cancel type set to ASYNCHRONOUS (old=%d)\n", oldtype);
 
     for (;;) {
+        sleep(5);
     }
     return NULL;
 }
