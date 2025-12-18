@@ -8,19 +8,16 @@
 typedef enum {
     MODE_ASC  = 0,
     MODE_DESC = 1,
-    MODE_EQ   = 2
+    MODE_EQ   = 2  
 } modes_t;
-
 
 void *pairs_counter_thread(void *arg) {
     modes_t mode = (modes_t)(long)arg;
 
     for (;;) {
-
-        long local_pairs = 0;
-
+        long local_pairs = 0;   
         Node *prev_locked = NULL;
-        Node *cur = g_storage.head->next;
+        Node *cur = g_storage.head->next; 
 
         if (!cur) {
             if (mode == MODE_ASC) {
@@ -77,10 +74,8 @@ void *pairs_counter_thread(void *arg) {
 
         sched_yield();
     }
-
     return NULL;
 }
-
 
 static int should_swap(Node *cur, Node *next, modes_t mode) {
     int len1 = (int)strlen(cur->value);
@@ -89,9 +84,9 @@ static int should_swap(Node *cur, Node *next, modes_t mode) {
     if (mode == MODE_ASC)  
         return len1 > len2;
     if (mode == MODE_DESC) 
-        return len1 < len2;
+        return len1 < len2;  
     if (mode == MODE_EQ)   
-        return len1 != len2;
+        return len1 != len2; 
     return 0;
 }
 
@@ -99,9 +94,8 @@ void *swapper_thread(void *arg) {
     modes_t mode = (modes_t)(long)arg;
 
     for (;;) {
-
         Node *prev = g_storage.head;
-        pthread_rwlock_wrlock(&prev->lock);
+        pthread_rwlock_rdlock(&prev->lock);
 
         Node *cur = prev->next;
         if (!cur) {
@@ -109,64 +103,77 @@ void *swapper_thread(void *arg) {
             sched_yield();
             continue;
         }
-
-        pthread_rwlock_wrlock(&cur->lock);
+        pthread_rwlock_rdlock(&cur->lock);
 
         int did_swap_in_pass = 0;
 
         while (cur && cur->next) {
             Node *next = cur->next;
-            pthread_rwlock_wrlock(&next->lock);
+            pthread_rwlock_rdlock(&next->lock);
 
-            int swapped = 0;
-
-            if ((rand() & 0xF) == 0) {
-                if (should_swap(cur, next, mode)) {
-                    Node *tail = next->next;
-
-                    prev->next = next;
-                    next->next = cur;
-                    cur->next  = tail;
-
-                    if (mode == MODE_ASC)      
-                        atomic_fetch_add(&asc_swaps, 1);
-                    else if (mode == MODE_DESC) 
-                        atomic_fetch_add(&desc_swaps, 1);
-                    else if (mode == MODE_EQ)   
-                        atomic_fetch_add(&eq_swaps, 1);
-
-                    swapped = 1;
-                    did_swap_in_pass = 1;
-                }
+            int potential_swap = 0;
+            
+            if ((rand() & 0xF) == 0 && should_swap(cur, next, mode)) {
+                potential_swap = 1;
             }
 
-            pthread_rwlock_unlock(&next->lock);
-
-            if (swapped) {
+            if (potential_swap) {
+                pthread_rwlock_unlock(&next->lock);
                 pthread_rwlock_unlock(&cur->lock);
                 pthread_rwlock_unlock(&prev->lock);
-                break;
+
+                pthread_rwlock_wrlock(&prev->lock);
+
+                cur = prev->next;
+                if (cur) {
+                    pthread_rwlock_wrlock(&cur->lock);
+                    next = cur->next;
+                    if (next) {
+                        pthread_rwlock_wrlock(&next->lock);
+                        if (should_swap(cur, next, mode)) {
+                            Node *tail = next->next;
+                            prev->next = next;
+                            next->next = cur;
+                            cur->next  = tail;
+
+                            if (mode == MODE_ASC) 
+                                atomic_fetch_add(&asc_swaps, 1);
+                            else if (mode == MODE_DESC) 
+                                atomic_fetch_add(&desc_swaps, 1);
+                            else if (mode == MODE_EQ) 
+                                atomic_fetch_add(&eq_swaps, 1);
+                            
+                            did_swap_in_pass = 1;
+                            
+                            pthread_rwlock_unlock(&next->lock);
+                            pthread_rwlock_unlock(&cur->lock);
+                            pthread_rwlock_unlock(&prev->lock);
+                            break; 
+                        }
+                        pthread_rwlock_unlock(&next->lock);
+                    }
+                    pthread_rwlock_unlock(&cur->lock);
+                }
+                pthread_rwlock_unlock(&prev->lock);
+                break; 
+
             } else {
                 pthread_rwlock_unlock(&prev->lock);
                 prev = cur;
-                cur = cur->next;
-                if (cur)
-                    pthread_rwlock_wrlock(&cur->lock);
+                cur = next;
             }
         }
 
         if (!did_swap_in_pass) {
-            if (cur)
+            if (cur) 
                 pthread_rwlock_unlock(&cur->lock);
             pthread_rwlock_unlock(&prev->lock);
         }
 
         sched_yield();
     }
-
     return NULL;
 }
-
 
 void *monitor_thread(void *arg) {
     const char *tag = (const char *)arg;
@@ -190,6 +197,5 @@ void *monitor_thread(void *arg) {
         );
         sleep(1);
     }
-
     return NULL;
 }
