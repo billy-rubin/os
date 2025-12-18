@@ -34,6 +34,11 @@ queue_t* queue_init(int max_count) {
 	q->add_attempts = q->get_attempts = 0;
 	q->add_count = q->get_count = 0;
 
+    if (pthread_spin_init(&q->lock, PTHREAD_PROCESS_PRIVATE) != 0) {
+        printf("pthread_spin_init failed\n");
+        abort();
+    }
+
 	err = pthread_create(&q->qmonitor_tid, NULL, qmonitor, q);
 	if (err) {
 		printf("queue_init: pthread_create() failed: %s\n", strerror(err));
@@ -50,6 +55,7 @@ void queue_destroy(queue_t *q) {
         current = current->next;
         free(temp);
     }
+    pthread_spin_destroy(&q->lock);
     free(q);
 }
 
