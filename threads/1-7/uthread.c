@@ -27,23 +27,22 @@ static void uthread_cleanup_main(void) {
     }
 }
 
-static int uthread_init(void) {
-    if (main_thread) return 0;
+void uthread_init(void) {
+    if (main_thread) return;
 
     main_thread = (uthread_t *)calloc(1, sizeof(struct uthread));
-    if (!main_thread) return -1;
+    if (!main_thread) return;
 
     if (getcontext(&main_thread->ctx) == -1) {
         free(main_thread);
         main_thread = NULL;
-        return -1;
+        return;
     }
 
     main_thread->state = UT_RUNNING;
     current_thread = main_thread;
     
     atexit(uthread_cleanup_main);
-    return 0;
 }
 
 static void enqueue_ready(uthread_t *t) {
@@ -57,12 +56,10 @@ static void enqueue_ready(uthread_t *t) {
 }
 
 static uthread_t *dequeue_ready(void) {
-    if (!ready_head) 
-        return NULL;
+    if (!ready_head) return NULL;
     uthread_t *t = ready_head;
     ready_head = t->next;
-    if (!ready_head) 
-        ready_tail = NULL;
+    if (!ready_head) ready_tail = NULL;
     t->next = NULL;
     return t;
 }
@@ -109,13 +106,12 @@ static void thread_trampoline(void) {
 
 int uthread_create(uthread_t **thread, void *(*start_routine)(void *), void *arg) {
     if (!main_thread) {
-        if (uthread_init() != 0) 
-            return -1;
+        uthread_init();
+        if (!main_thread) return -1;
     }
 
     uthread_t *t = (uthread_t *)calloc(1, sizeof(struct uthread));
-    if (!t) 
-        return -1;
+    if (!t) return -1;
 
     t->stack = (char *)malloc(UTHREAD_STACK_SIZE);
     if (!t->stack) {
@@ -141,22 +137,18 @@ int uthread_create(uthread_t **thread, void *(*start_routine)(void *), void *arg
 
     enqueue_ready(t);
 
-    if (thread) 
-        *thread = t;
+    if (thread) *thread = t;
     return 0;
 }
 
 void uthread_yield(void) {
-    if (main_thread) 
-        schedule();
+    if (main_thread) schedule();
 }
 
 int uthread_join(uthread_t *thread, void **retval) {
-    if (!thread || !main_thread || thread == current_thread) 
-        return -1;
+    if (!thread || !main_thread || thread == current_thread) return -1;
 
-    if (thread->joiner) 
-        return -1;
+    if (thread->joiner) return -1;
 
     while (thread->state != UT_FINISHED) {
         current_thread->state = UT_BLOCKED;
@@ -166,8 +158,7 @@ int uthread_join(uthread_t *thread, void **retval) {
 
     if (retval) *retval = thread->retval;
 
-    if (thread->stack) 
-        free(thread->stack);
+    if (thread->stack) free(thread->stack);
     free(thread);
 
     return 0;
