@@ -3,7 +3,7 @@ SRCS = main.c uthread.c
 
 CC=gcc
 RM=rm
-CFLAGS= -g -Wall -fsanitize=address
+CFLAGS= -g -Wall -Wextra -Werror -fsanitize=address
 LIBS=-lpthread
 INCLUDE_DIR="."
 

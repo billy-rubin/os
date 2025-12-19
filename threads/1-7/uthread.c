@@ -1,8 +1,5 @@
 #define _GNU_SOURCE
 #include "uthread.h"
-#include <stdlib.h>
-#include <ucontext.h>
-#include <stdbool.h>
 
 struct uthread {
     ucontext_t ctx;
@@ -15,103 +12,100 @@ struct uthread {
     struct uthread *next;
 };
 
-static uthread_t *main_thread = NULL;
-static uthread_t *current_thread = NULL;
-static uthread_t *ready_head = NULL;
-static uthread_t *ready_tail = NULL;
+static pthread_mutex_t queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+static uthread_t ready_head = NULL;
+static uthread_t ready_tail = NULL;
+static pthread_t workers[NUM_WORKERS];
+static bool initialized = false;
 
-static void uthread_cleanup_main(void) {
-    if (main_thread) {
-        free(main_thread);
-        main_thread = NULL;
-    }
-}
+static __thread uthread_t current_thread = NULL;
+static __thread ucontext_t worker_ctx;
 
-void uthread_init(void) {
-    if (main_thread) return;
-
-    main_thread = (uthread_t *)calloc(1, sizeof(struct uthread));
-    if (!main_thread) return;
-
-    if (getcontext(&main_thread->ctx) == -1) {
-        free(main_thread);
-        main_thread = NULL;
-        return;
-    }
-
-    main_thread->state = UT_RUNNING;
-    current_thread = main_thread;
-    
-    atexit(uthread_cleanup_main);
-}
-
-static void enqueue_ready(uthread_t *t) {
+static void enqueue_ready(uthread_t t) {
+    pthread_mutex_lock(&queue_mutex);
     t->next = NULL;
+    t->state = UT_READY;
     if (ready_tail) {
         ready_tail->next = t;
         ready_tail = t;
     } else {
         ready_head = ready_tail = t;
     }
+    pthread_mutex_unlock(&queue_mutex);
 }
 
-static uthread_t *dequeue_ready(void) {
-    if (!ready_head) return NULL;
-    uthread_t *t = ready_head;
+static uthread_t dequeue_ready(void) {
+    pthread_mutex_lock(&queue_mutex);
+    if (!ready_head) {
+        pthread_mutex_unlock(&queue_mutex);
+        return NULL;
+    }
+    uthread_t t = ready_head;
     ready_head = t->next;
-    if (!ready_head) ready_tail = NULL;
+    if (!ready_head) 
+        ready_tail = NULL;
     t->next = NULL;
+    pthread_mutex_unlock(&queue_mutex);
     return t;
 }
 
-static void schedule(void) {
-    uthread_t *prev = current_thread;
-    uthread_t *next = dequeue_ready();
-
-    if (!next) {
-        if (prev->state == UT_FINISHED && prev == main_thread) {
-            exit(0);
-        }
-        return; 
-    }
-
-    current_thread = next;
-    current_thread->state = UT_RUNNING;
-
-    if (prev->state == UT_RUNNING) {
-        prev->state = UT_READY;
-        enqueue_ready(prev);
-    }
-
-    swapcontext(&prev->ctx, &next->ctx);
-}
-
 static void thread_trampoline(void) {
-    uthread_t *self = current_thread;
+    uthread_t self = current_thread;
     void *ret = self->start_routine(self->arg);
     
     self->retval = ret;
+    
+    pthread_mutex_lock(&queue_mutex);
     self->state = UT_FINISHED;
-
     if (self->joiner) {
-        if (self->joiner->state == UT_BLOCKED) {
-            self->joiner->state = UT_READY;
-            enqueue_ready(self->joiner);
+        self->joiner->state = UT_READY;
+        
+        self->joiner->next = NULL;
+        if (ready_tail) {
+            ready_tail->next = self->joiner;
+            ready_tail = self->joiner;
+        } else {
+            ready_head = ready_tail = self->joiner;
         }
         self->joiner = NULL;
     }
+    pthread_mutex_unlock(&queue_mutex);
 
-    schedule();
+    setcontext(&worker_ctx);
 }
 
-int uthread_create(uthread_t **thread, void *(*start_routine)(void *), void *arg) {
-    if (!main_thread) {
-        uthread_init();
-        if (!main_thread) return -1;
+static void *worker_routine(void *arg) {
+    (void)arg;
+    while (true) {
+        uthread_t t = dequeue_ready();
+        if (t) {
+            current_thread = t;
+            t->state = UT_RUNNING;
+            swapcontext(&worker_ctx, &t->ctx);
+            current_thread = NULL;
+        } else {
+            sched_yield();
+        }
     }
+    return NULL;
+}
 
-    uthread_t *t = (uthread_t *)calloc(1, sizeof(struct uthread));
-    if (!t) return -1;
+static void uthread_init(void) {
+    if (initialized) 
+        return;
+    initialized = true;
+    for (int i = 0; i < NUM_WORKERS; i++) {
+        pthread_create(&workers[i], NULL, worker_routine, NULL);
+    }
+}
+
+int uthread_create(uthread_t *thread, void *(*start_routine)(void *), void *arg) {
+    if (!initialized) 
+        uthread_init();
+
+    uthread_t t = (uthread_t)calloc(1, sizeof(struct uthread));
+    if (!t) 
+        return -1;
 
     t->stack = (char *)malloc(UTHREAD_STACK_SIZE);
     if (!t->stack) {
@@ -128,7 +122,6 @@ int uthread_create(uthread_t **thread, void *(*start_routine)(void *), void *arg
     t->ctx.uc_stack.ss_sp = t->stack;
     t->ctx.uc_stack.ss_size = UTHREAD_STACK_SIZE;
     t->ctx.uc_link = NULL;
-
     t->start_routine = start_routine;
     t->arg = arg;
     t->state = UT_READY;
@@ -137,29 +130,49 @@ int uthread_create(uthread_t **thread, void *(*start_routine)(void *), void *arg
 
     enqueue_ready(t);
 
-    if (thread) *thread = t;
+    if (thread) 
+        *thread = t;
     return 0;
 }
 
 void uthread_yield(void) {
-    if (main_thread) schedule();
+    if (current_thread) {
+        uthread_t self = current_thread;
+        enqueue_ready(self);
+        swapcontext(&self->ctx, &worker_ctx);
+    } else {
+        sched_yield();
+    }
 }
 
-int uthread_join(uthread_t *thread, void **retval) {
-    if (!thread || !main_thread || thread == current_thread) return -1;
+int uthread_join(uthread_t thread, void **retval) {
+    if (!thread) 
+        return -1;
 
-    if (thread->joiner) return -1;
-
-    while (thread->state != UT_FINISHED) {
-        current_thread->state = UT_BLOCKED;
-        thread->joiner = current_thread;
-        schedule();
+    if (current_thread) {
+        if (thread->state != UT_FINISHED) {
+            pthread_mutex_lock(&queue_mutex);
+            if (thread->state != UT_FINISHED) {
+                current_thread->state = UT_BLOCKED;
+                thread->joiner = current_thread;
+                pthread_mutex_unlock(&queue_mutex);
+                swapcontext(&current_thread->ctx, &worker_ctx);
+            } else {
+                pthread_mutex_unlock(&queue_mutex);
+            }
+        }
+    } else {
+        while (thread->state != UT_FINISHED) {
+            usleep(1000);
+        }
     }
 
-    if (retval) *retval = thread->retval;
+    if (retval) 
+        *retval = thread->retval;
 
-    if (thread->stack) free(thread->stack);
+    if (thread->stack) 
+        free(thread->stack);
     free(thread);
-
+    
     return 0;
 }

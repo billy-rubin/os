@@ -19,7 +19,7 @@ void *test1_worker(void *arg) {
 
 void test_interleaving(void) {
     printf("=== TEST 1: Argument Passing & Context Switch (Interleaving) ===\n");
-    uthread_t *t1, *t2;
+    uthread_t t1, t2;
     test1_arg_t arg1 = {1, 3};
     test1_arg_t arg2 = {2, 3};
 
@@ -51,7 +51,7 @@ void *test2_calculator(void *arg) {
 
 void test_return_value(void) {
     printf("=== TEST 2: Return Values ===\n");
-    uthread_t *t;
+    uthread_t t;
     int input = 12;
     void *retval;
 
@@ -90,16 +90,16 @@ void *test3_worker(void *arg) {
 
 void test_many_threads(void) {
     printf("=== TEST 3: Multiple Threads Execution ===\n");
-    uthread_t *threads[NUM_THREADS];
+    uthread_t threads[2*NUM_THREADS];
 
-    for (long i = 0; i < NUM_THREADS; i++) {
+    for (long i = 0; i < 2*NUM_THREADS; i++) {
         if (uthread_create(&threads[i], test3_worker, (void *)(i + 1)) != 0) {
             fprintf(stderr, "Failed to create thread %ld\n", i);
             exit(1);
         }
     }
 
-    for (int i = 0; i < NUM_THREADS; i++) {
+    for (int i = 0; i <2* NUM_THREADS; i++) {
         uthread_join(threads[i], NULL);
     }
     printf("=== TEST 3 PASSED ===\n\n");
