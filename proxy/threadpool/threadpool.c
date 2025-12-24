@@ -5,7 +5,7 @@
 
 static void *workerLoop(void *arg);
 
-threadPool_t *CreateThreadPool(int num_threads) {
+threadPool_t *threadpoll_init(int num_threads) {
     if (num_threads <= 0) 
         return NULL;
     
@@ -56,7 +56,7 @@ threadPool_t *CreateThreadPool(int num_threads) {
     return pool;
 }
 
-int SubmitTask(threadPool_t *pool, threadTaskFn fn, void *arg) {
+int threadpool_submit_task(threadPool_t *pool, threadTaskFn fn, void *arg) {
     if (!pool || !fn) 
         return -1;
 
@@ -89,7 +89,7 @@ int SubmitTask(threadPool_t *pool, threadTaskFn fn, void *arg) {
     return 0;
 }
 
-void StopThreadPool(threadPool_t *pool) {
+void threadpool_stop(threadPool_t *pool) {
     if (!pool) 
         return;
 
