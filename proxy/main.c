@@ -1,42 +1,20 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
 
-#include "threadpool/threadpool.h"
-
-#define N_THREADS 4
-
-static void my_function(void *arg) {
-    long id = *(long *)arg;
-    free(arg);
-
-    printf("[task %ld] started\n", id);
-    usleep(100 * 1000);
-    printf("[task %ld] finished\n", id);
-}
+#include "proxy.h"
+#include "logger/logger.h"
 
 int main(void) {
-    threadPool_t *pool = threadpoll_init(3);
-    if (!pool) {
-        fprintf(stderr, "failed to create thread pool\n");
-        return 1;
-    }
+    logger_init(LOG_DEBUG);
 
-    for (long i = 0; i < N_THREADS; ++i) {
-        long *id = malloc(sizeof(long));
-        if (!id) {
-            fprintf(stderr, "malloc failed\n");
-            break;
-        }
-        *id = i;
-        if (threadpool_submit_task(pool, my_function, id) != 0) {
-            fprintf(stderr, "submit failed for task %ld\n", i);
-            free(id);
-        }
-    }
+    proxy_config_t cfg;
+    cfg.listen_port = 8080;
+    cfg.worker_count = 8;
 
-    sleep(1);
+    log_info("starting proxy on port %d with %d workers", cfg.listen_port, cfg.worker_count);
 
-    threadpool_stop(pool);
-    return 0;
+    int rc = proxy_run(&cfg);
+    if (rc != 0) log_error("proxy failed with code %d", rc);
+
+    logger_finalize();
+    return rc;
 }
