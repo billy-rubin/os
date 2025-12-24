@@ -1,5 +1,5 @@
 TARGET = proxy
-SRCS = main.c
+SRCS = main.c threadpool/threadpool.c
 
 CC=gcc
 RM=rm

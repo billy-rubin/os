@@ -16,7 +16,7 @@ static void my_function(void *arg) {
 }
 
 int main(void) {
-    threadPool_t *pool = Create(3);
+    threadPool_t *pool = CreateThreadPool(3);
     if (!pool) {
         fprintf(stderr, "failed to create thread pool\n");
         return 1;
@@ -29,7 +29,7 @@ int main(void) {
             break;
         }
         *id = i;
-        if (Submit(pool, my_function, id) != 0) {
+        if (SubmitTask(pool, my_function, id) != 0) {
             fprintf(stderr, "submit failed for task %ld\n", i);
             free(id);
         }
@@ -37,6 +37,6 @@ int main(void) {
 
     sleep(1);
 
-    Stop(pool);
+    StopThreadPool(pool);
     return 0;
 }

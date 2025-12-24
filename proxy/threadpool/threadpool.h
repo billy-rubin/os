@@ -23,8 +23,8 @@ typedef struct threadPool {
     pthread_cond_t  isBusy;
 } threadPool_t;
 
-threadPool_t *Create(int num_threads);
-int           Submit(threadPool_t *pool, threadTaskFn fn, void *arg);
-void          Stop(threadPool_t *pool);
+threadPool_t *CreateThreadPool(int num_threads);
+int           SubmitTask(threadPool_t *pool, threadTaskFn fn, void *arg);
+void          StopThreadPool(threadPool_t *pool);
 
 #endif
