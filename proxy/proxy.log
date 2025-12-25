@@ -6,3 +6,8 @@
 [15:13:42] [INF] proxy listening on port 0
 [16:51:37] [INF] starting proxy on port 7 with 4100 workers
 [16:51:37] [INF] proxy listening on port 0
+[17:53:01] [INF] starting proxy on port 7 with 4100 workers
+[17:53:01] [DBG] cache table initialized
+[17:53:01] [INF] proxy listening on port 0
+[17:58:12] [DBG] accepted client fd=0
+[17:58:12] [DBG] client fd=4: handler started
