@@ -2,6 +2,7 @@
 #include "logger/logger.h"
 
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -15,11 +16,15 @@ static unsigned long hash_key(const char *s) {
 }
 
 static void lru_remove(cache_table_t *table, cache_entry_t *entry) {
-    if (entry->lru_prev) entry->lru_prev->lru_next = entry->lru_next;
-    else table->lru_head = entry->lru_next;
+    if (entry->lru_prev) 
+        entry->lru_prev->lru_next = entry->lru_next;
+    else 
+        table->lru_head = entry->lru_next;
 
-    if (entry->lru_next) entry->lru_next->lru_prev = entry->lru_prev;
-    else table->lru_tail = entry->lru_prev;
+    if (entry->lru_next) 
+        entry->lru_next->lru_prev = entry->lru_prev;
+    else 
+        table->lru_tail = entry->lru_prev;
 
     entry->lru_prev = NULL;
     entry->lru_next = NULL;
@@ -29,15 +34,58 @@ static void lru_push_front(cache_table_t *table, cache_entry_t *entry) {
     entry->lru_next = table->lru_head;
     entry->lru_prev = NULL;
 
-    if (table->lru_head) table->lru_head->lru_prev = entry;
-    else table->lru_tail = entry;
+    if (table->lru_head) 
+        table->lru_head->lru_prev = entry;
+    else 
+        table->lru_tail = entry;
 
     table->lru_head = entry;
 }
 
+static cache_entry_t *cache_entry_create(const char *key) {
+    cache_entry_t *e = calloc(1, sizeof(*e));
+    if (!e) return NULL;
+
+    e->key = strdup(key);
+    if (!e->key) {
+        free(e);
+        return NULL;
+    }
+
+    e->refcnt = 1;
+
+    if (pthread_mutex_init(&e->lock, NULL) != 0) {
+        free(e->key);
+        free(e);
+        return NULL;
+    }
+    if (pthread_cond_init(&e->cond, NULL) != 0) {
+        pthread_mutex_destroy(&e->lock);
+        free(e->key);
+        free(e);
+        return NULL;
+    }
+
+    return e;
+}
+
+static void cache_entry_destroy(cache_entry_t *entry) {
+    if (!entry) return;
+    
+    pthread_mutex_destroy(&entry->lock);
+    pthread_cond_destroy(&entry->cond);
+    
+    if (entry->data) free(entry->data);
+    if (entry->key)  free(entry->key);
+    
+    free(entry);
+}
+
+
 static void free_entry_completely(cache_table_t *table, cache_entry_t *entry) {
     unsigned long h = hash_key(entry->key);
     size_t idx = h % CACHE_BUCKETS;
+    
     cache_entry_t **pp = &table->buckets[idx];
     while (*pp) {
         if (*pp == entry) {
@@ -50,25 +98,53 @@ static void free_entry_completely(cache_table_t *table, cache_entry_t *entry) {
     lru_remove(table, entry);
 
     if (table->current_size >= entry->size)
-        table->current_size -= entry->size;
+        __sync_fetch_and_sub(&table->current_size, entry->size); 
 
     log_debug("GC: Evicting key='%s', size=%zu", entry->key, entry->size);
-    pthread_mutex_destroy(&entry->lock);
-    pthread_cond_destroy(&entry->cond);
-    free(entry->data);
-    free(entry->key);
-    free(entry);
+
+    cache_entry_destroy(entry);
 }
 
+int cache_table_init(cache_table_t *table) {
+    if (!table) return -1;
 
-void cache_table_init(cache_table_t *table) {
     memset(table->buckets, 0, sizeof(table->buckets));
     table->lru_head = NULL;
     table->lru_tail = NULL;
     table->current_size = 0;
     table->max_size = CACHE_MAX_SIZE;
-    pthread_mutex_init(&table->lock, NULL);
+
+    if (pthread_mutex_init(&table->lock, NULL) != 0) {
+        return -1;
+    }
+
     log_debug("cache table initialized");
+    return 0;
+}
+
+void cache_table_destroy(cache_table_t *table) {
+    if (!table) 
+        return;
+
+    pthread_mutex_lock(&table->lock);
+    
+    for (int i = 0; i < CACHE_BUCKETS; ++i) {
+        cache_entry_t *e = table->buckets[i];
+        while (e) {
+            cache_entry_t *next = e->next;
+            cache_entry_destroy(e);
+            e = next;
+        }
+        table->buckets[i] = NULL;
+    }
+
+    table->lru_head = NULL;
+    table->lru_tail = NULL;
+    table->current_size = 0;
+
+    pthread_mutex_unlock(&table->lock);
+    pthread_mutex_destroy(&table->lock);
+    log_debug("cache table destroyed");
 }
 
 static int ensure_capacity(cache_entry_t *entry, size_t need) {
@@ -89,6 +165,9 @@ static int ensure_capacity(cache_entry_t *entry, size_t need) {
 }
 
 cache_entry_t *cache_start_or_join(cache_table_t *table, const char *key, int *am_writer) {
+    if (!table || !key || !am_writer) 
+        return NULL;
+
     *am_writer = 0;
     pthread_mutex_lock(&table->lock);
 
@@ -99,8 +178,10 @@ cache_entry_t *cache_start_or_join(cache_table_t *table, const char *key, int *a
     while (e) {
         if (strcmp(e->key, key) == 0) {
             e->refcnt++;
+            
             lru_remove(table, e);
             lru_push_front(table, e);
+            
             log_debug("cache HIT and LRU update key='%s', refcnt=%d", key, e->refcnt);
             pthread_mutex_unlock(&table->lock);
             return e;
@@ -108,26 +189,16 @@ cache_entry_t *cache_start_or_join(cache_table_t *table, const char *key, int *a
         e = e->next;
     }
 
-    e = calloc(1, sizeof(*e));
+    e = cache_entry_create(key);
     if (!e) {
-        log_error("cache_start_or_join: malloc failed for key '%s'", key);
+        log_error("cache_start_or_join: failed to create entry for key='%s'", key);
         pthread_mutex_unlock(&table->lock);
         return NULL;
     }
 
-    e->key = strdup(key);
-    e->data = NULL;
-    e->size = 0;
-    e->capacity = 0;
-    e->complete = 0;
-    e->failed = 0;
-    e->refcnt = 1;
-
-    pthread_mutex_init(&e->lock, NULL);
-    pthread_cond_init(&e->cond, NULL);
-
     e->next = table->buckets[idx];
     table->buckets[idx] = e;
+
     lru_push_front(table, e);
 
     *am_writer = 1;
@@ -138,9 +209,14 @@ cache_entry_t *cache_start_or_join(cache_table_t *table, const char *key, int *a
 }
 
 void cache_release(cache_table_t *table, cache_entry_t *entry) {
+    if (!table || !entry) 
+        return;
+
     pthread_mutex_lock(&table->lock);
 
-    entry->refcnt--;
+    if (entry->refcnt > 0)
+        entry->refcnt--;
+    
     log_debug("cache_release key='%s', refcnt=%d", entry->key, entry->refcnt);
     
     if (entry->refcnt == 0 && entry->failed) {
@@ -151,6 +227,11 @@ void cache_release(cache_table_t *table, cache_entry_t *entry) {
 }
 
 int cache_add(cache_entry_t *entry, const void *buf, size_t len, cache_table_t *table) {
+    if (!entry || !buf || len == 0) 
+        return 0;
+    if (!table) 
+        return -1;
+
     pthread_mutex_lock(&entry->lock);
 
     if (entry->failed) {
@@ -163,7 +244,7 @@ int cache_add(cache_entry_t *entry, const void *buf, size_t len, cache_table_t *
         entry->failed = 1;
         pthread_cond_broadcast(&entry->cond);
         pthread_mutex_unlock(&entry->lock);
-        log_error("cache_add: realloc failed");
+        log_error("cache_add: realloc failed for key='%s'", entry->key);
         return -1;
     }
 
@@ -177,23 +258,35 @@ int cache_add(cache_entry_t *entry, const void *buf, size_t len, cache_table_t *
     return 0;
 }
 
-void cache_complete(cache_entry_t *entry) {
+int cache_complete(cache_entry_t *entry) {
+    if (!entry) 
+        return -1;
+
     pthread_mutex_lock(&entry->lock);
     entry->complete = 1;
     pthread_cond_broadcast(&entry->cond);
     pthread_mutex_unlock(&entry->lock);
+    
     log_debug("cache_complete for key='%s'", entry->key);
+    return 0;
 }
 
-void cache_failed(cache_entry_t *entry) {
+int cache_failed(cache_entry_t *entry) {
+    if (!entry) 
+        return -1;
+
     pthread_mutex_lock(&entry->lock);
     entry->failed = 1;
     pthread_cond_broadcast(&entry->cond);
     pthread_mutex_unlock(&entry->lock);
+    
     log_error("cache_failed for key='%s'", entry->key);
+    return 0;
 }
 
 void cache_evict_if_needed(cache_table_t *table) {
+    if (!table) return;
+
     pthread_mutex_lock(&table->lock);
 
     while (table->current_size > table->max_size) {
@@ -208,14 +301,15 @@ void cache_evict_if_needed(cache_table_t *table) {
                 log_debug("GC: Removing old entry '%s' to free space", candidate->key);
                 free_entry_completely(table, candidate);
                 freed_something = 1;
-                break;
+                break; 
             }
             
             candidate = prev;
         }
 
         if (!freed_something) {
-            log_debug("GC: Cache full, but all entries are active. Can't evict.");
+            log_debug("GC: Cache full (%zu/%zu), but all entries are active. Can't evict.", 
+                      table->current_size, table->max_size);
             break;
         }
     }

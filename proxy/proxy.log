@@ -11,3 +11,78 @@
 [17:53:01] [INF] proxy listening on port 0
 [17:58:12] [DBG] accepted client fd=0
 [17:58:12] [DBG] client fd=4: handler started
+[18:36:53] [INF] starting proxy on port 7 with 4100 workers
+[18:36:53] [DBG] cache table initialized
+[18:36:53] [INF] proxy listening on port 0
+[18:37:24] [DBG] accepted client fd=0
+[18:37:24] [DBG] client fd=4: handler started
+[18:46:03] [INF] starting proxy on port 7 with 4100 workers
+[18:46:03] [DBG] cache table initialized
+[18:46:03] [INF] proxy listening on port 0
+[18:46:07] [DBG] accepted client fd=0
+[18:46:07] [DBG] client fd=0: handler started
+[18:49:58] [INF] starting proxy on port 4242 with 8 workers
+[18:49:58] [DBG] cache table initialized
+[18:49:58] [INF] proxy listening on port 4242
+[18:50:02] [DBG] accepted client fd=5
+[18:50:02] [DBG] client fd=5: handler started
+[18:50:02] [DBG] client fd=5: method=GET host=ccfit.nsu.ru uri=/~rzheutskiy/test_files/500mb.dat
+[18:50:02] [DBG] cache MISS, new entry key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat'
+[18:50:02] [DBG] client fd=5: key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', am_writer=1
+[18:50:02] [DBG] connected to origin ccfit.nsu.ru:80, fd=7
+[18:50:02] [INF] client fd=5: writer for key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', origin fd=7
+[18:51:00] [DBG] client fd=5: origin closed connection, marking complete
+[18:51:00] [DBG] cache_complete for key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat'
+[18:51:00] [DBG] cache_release key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', refcnt=0
+[18:51:00] [DBG] client fd=5: handler finished
+[18:51:19] [DBG] accepted client fd=6
+[18:51:19] [DBG] client fd=6: handler started
+[18:51:19] [DBG] client fd=6: method=GET host=ccfit.nsu.ru uri=/~rzheutskiy/test_files/500mb.dat
+[18:51:19] [DBG] cache HIT and LRU update key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', refcnt=1
+[18:51:19] [DBG] client fd=6: key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', am_writer=0
+[18:51:19] [DBG] client fd=6: reader for key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', streaming from cache
+[18:51:20] [DBG] stream_from_cache: finished for fd=6
+[18:51:20] [DBG] cache_release key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', refcnt=0
+[18:51:20] [DBG] client fd=6: handler finished
+[18:51:31] [DBG] accepted client fd=5
+[18:51:31] [DBG] client fd=5: handler started
+[18:51:31] [DBG] client fd=5: method=GET host=ccfit.nsu.ru uri=/~rzheutskiy/test_files/500mb.dat
+[18:51:31] [DBG] cache HIT and LRU update key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', refcnt=1
+[18:51:31] [DBG] client fd=5: key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', am_writer=0
+[18:51:31] [DBG] client fd=5: reader for key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', streaming from cache
+[18:51:31] [DBG] stream_from_cache: finished for fd=5
+[18:51:31] [DBG] cache_release key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', refcnt=0
+[18:51:31] [DBG] client fd=5: handler finished
+[18:54:16] [INF] starting proxy on port 4242 with 8 workers
+[18:54:16] [DBG] cache table initialized
+[18:54:16] [INF] proxy listening on port 4242
+[18:54:24] [DBG] accepted client fd=5
+[18:54:24] [DBG] client fd=5: handler started
+[18:54:24] [DBG] client fd=5: method=GET host=ccfit.nsu.ru uri=/~rzheutskiy/test_files/500mb.dat
+[18:54:24] [DBG] cache MISS, new entry key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat'
+[18:54:24] [DBG] client fd=5: key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', am_writer=1
+[18:54:24] [DBG] connected to origin ccfit.nsu.ru:80, fd=7
+[18:54:24] [INF] client fd=5: writer for key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', origin fd=7
+[18:54:36] [DBG] accepted client fd=6
+[18:54:36] [DBG] client fd=6: handler started
+[18:54:36] [DBG] client fd=6: method=GET host=ccfit.nsu.ru uri=/~rzheutskiy/test_files/500mb.dat
+[18:54:36] [DBG] cache HIT and LRU update key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', refcnt=2
+[18:54:36] [DBG] client fd=6: key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', am_writer=0
+[18:54:36] [DBG] client fd=6: reader for key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', streaming from cache
+[18:54:59] [DBG] accepted client fd=8
+[18:54:59] [DBG] client fd=8: handler started
+[18:54:59] [DBG] client fd=8: method=GET host=ccfit.nsu.ru uri=/~rzheutskiy/test_files/500mb.dat
+[18:54:59] [DBG] cache HIT and LRU update key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', refcnt=3
+[18:54:59] [DBG] client fd=8: key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', am_writer=0
+[18:54:59] [DBG] client fd=8: reader for key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', streaming from cache
+[18:55:10] [ERR] stream_from_cache: send_all to client fd=8 failed: Connection reset by peer
+[18:55:10] [INF] stream_from_cache: client fd=8 closed connection
+[18:55:10] [DBG] cache_release key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', refcnt=2
+[18:55:10] [DBG] client fd=8: handler finished
+[18:55:22] [DBG] client fd=5: origin closed connection, marking complete
+[18:55:22] [DBG] cache_complete for key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat'
+[18:55:22] [DBG] cache_release key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', refcnt=1
+[18:55:22] [DBG] client fd=5: handler finished
+[18:55:22] [DBG] stream_from_cache: finished for fd=6
+[18:55:22] [DBG] cache_release key='ccfit.nsu.ru /~rzheutskiy/test_files/500mb.dat', refcnt=0
+[18:55:22] [DBG] client fd=6: handler finished

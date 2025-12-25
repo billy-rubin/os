@@ -34,11 +34,12 @@ typedef struct cache_table {
 } cache_table_t;
 
 
-void cache_table_init(cache_table_t *table);
+int cache_table_init(cache_table_t *table);
+void cache_table_destroy(cache_table_t *table);
 cache_entry_t *cache_start_or_join(cache_table_t *table, const char *key, int *am_writer);
 void cache_release(cache_table_t *table, cache_entry_t *entry);
 int cache_add(cache_entry_t *entry, const void *buf, size_t len, cache_table_t *table);
-void cache_complete(cache_entry_t *entry);
-void cache_failed(cache_entry_t *entry);
+int cache_complete(cache_entry_t *entry);
+int cache_failed(cache_entry_t *entry);
 void cache_evict_if_needed(cache_table_t *table);
 #endif

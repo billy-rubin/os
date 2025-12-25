@@ -157,6 +157,12 @@ static void stream_from_cache(cache_entry_t *entry, int client_fd) {
 
         if (send_all(client_fd, tmp, chunk) < 0) {
             log_error("stream_from_cache: send_all to client fd=%d failed: %s", client_fd, strerror(errno));
+            if (errno == EPIPE || errno == ECONNRESET) {
+                log_info("stream_from_cache: client fd=%d closed connection", client_fd);
+            } else {
+                log_error("stream_from_cache: send_all to client fd=%d failed: %s",
+                          client_fd, strerror(errno));
+            }
             break;
         }
     }
@@ -166,8 +172,7 @@ static void handle_client(void *arg) {
     client_ctx_t *ctx = (client_ctx_t *)arg;
     int cfd = ctx->client_fd;
     cache_table_t *cache = ctx->cache;
-    free(ctx);
-
+    
     log_debug("client fd=%d: handler started", cfd);
 
     char   buf[8192];
@@ -176,17 +181,14 @@ static void handle_client(void *arg) {
     for (;;) {
         ssize_t n = recv(cfd, buf + used, sizeof(buf) - used, 0);
         if (n < 0) {
-            if (errno == EINTR) 
-                continue;
+            if (errno == EINTR) continue;
             log_error("client fd=%d: recv failed: %s", cfd, strerror(errno));
-            close(cfd);
-            return;
+            goto cleanup;
         }
 
         if (n == 0) {
             log_info("client fd=%d: closed connection before headers", cfd);
-            close(cfd);
-            return;
+            goto cleanup;
         }
 
         used += (size_t)n;
@@ -196,16 +198,14 @@ static void handle_client(void *arg) {
 
         if (used == sizeof(buf)) {
             log_error("client fd=%d: headers too large", cfd);
-            close(cfd);
-            return;
+            goto cleanup;
         }
     }
 
     char *line_end = memmem_simple(buf, used, "\r\n", 2);
     if (!line_end) {
         log_error("client fd=%d: no CRLF in request line", cfd);
-        close(cfd);
-        return;
+        goto cleanup;
     }
     *line_end = '\0';
 
@@ -213,8 +213,7 @@ static void handle_client(void *arg) {
     char *sp1 = strchr(method, ' ');
     if (!sp1) {
         log_error("client fd=%d: bad request line (no space after method)", cfd);
-        close(cfd);
-        return;
+        goto cleanup;
     }
     *sp1 = '\0';
 
@@ -222,26 +221,21 @@ static void handle_client(void *arg) {
     char *sp2  = strchr(path, ' ');
     if (!sp2) {
         log_error("client fd=%d: bad request line (no space before HTTP)", cfd);
-        close(cfd);
-        return;
+        goto cleanup;
     }
     *sp2 = '\0';
 
     if (strcmp(method, "GET") != 0) {
         log_info("client fd=%d: unsupported method '%s', closing", cfd, method);
-        close(cfd);
-        return;
+        goto cleanup;
     }
 
     char *uri = path;
     if (strncmp(path, "http://", 7) == 0) {
         char *p = path + 7;
-        while (*p && *p != '/') 
-            p++;
-        if (*p == '\0') 
-            uri = (char *)"/";
-        else 
-            uri = p;
+        while (*p && *p != '/') p++;
+        if (*p == '\0') uri = (char *)"/";
+        else uri = p;
     }
 
     char *headers_start = line_end + 2;
@@ -250,21 +244,18 @@ static void handle_client(void *arg) {
     char *host_start = find_host_header(headers_start, headers_len);
     if (!host_start) {
         log_error("client fd=%d: Host header not found", cfd);
-        close(cfd);
-        return;
+        goto cleanup;
     }
 
     char *p = host_start;
     char *buf_end = buf + used;
-    while (p < buf_end && *p != '\r' && *p != '\n') 
-        p++;
+    while (p < buf_end && *p != '\r' && *p != '\n') p++;
     
     *p = '\0';
 
     char host[256];
     size_t host_len = strlen(host_start);
-    if (host_len >= sizeof(host)) 
-        host_len = sizeof(host) - 1;
+    if (host_len >= sizeof(host)) host_len = sizeof(host) - 1;
     memcpy(host, host_start, host_len);
     host[host_len] = '\0';
 
@@ -277,8 +268,7 @@ static void handle_client(void *arg) {
     cache_entry_t *entry = cache_start_or_join(cache, key, &am_writer);
     if (!entry) {
         log_error("client fd=%d: cache_start_or_join failed for key='%s'", cfd, key);
-        close(cfd);
-        return;
+        goto cleanup;
     }
 
     log_debug("client fd=%d: key='%s', am_writer=%d", cfd, key, am_writer);
@@ -287,55 +277,43 @@ static void handle_client(void *arg) {
         log_debug("client fd=%d: reader for key='%s', streaming from cache", cfd, key);
         stream_from_cache(entry, cfd);
         cache_release(cache, entry);
-        close(cfd);
-        return;
+        goto cleanup;
     }
 
     int ofd = connect_to_origin(host, 80);
     if (ofd < 0) {
-        const char *resp =
-            "HTTP/1.0 502 Bad Gateway\r\n"
-            "Connection: close\r\n"
-            "Content-Length: 0\r\n"
-            "\r\n";
-
+        const char *resp = "HTTP/1.0 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
         (void)send_all(cfd, resp, strlen(resp));
         cache_failed(entry);
         cache_release(cache, entry);
-        close(cfd);
-        return;
+        goto cleanup;
     }
 
     log_info("client fd=%d: writer for key='%s', origin fd=%d", cfd, key, ofd);
 
     char req[4096];
     int req_len = snprintf(req, sizeof(req),
-                           "GET %s HTTP/1.0\r\n"
-                           "Host: %s\r\n"
-                           "Connection: close\r\n"
-                           "\r\n",
+                           "GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n",
                            uri, host);
+    
     if (req_len <= 0 || req_len >= (int)sizeof(req)) {
         log_error("client fd=%d: failed to build HTTP/1.0 request", cfd);
         cache_failed(entry);
         cache_release(cache, entry);
         close(ofd);
-        close(cfd);
-        return;
+        goto cleanup;
     }
-
-    log_debug("client fd=%d: sending request to origin:\n%.*s", cfd, req_len, req);
 
     if (send_all(ofd, req, (size_t)req_len) < 0) {
         log_error("client fd=%d: send_all to origin failed: %s", cfd, strerror(errno));
         cache_failed(entry);
         cache_release(cache, entry);
         close(ofd);
-        close(cfd);
-        return;
+        goto cleanup;
     }
 
     char serv_buf[8192];
+    int client_alive = 1;
     for (;;) {
         ssize_t n = recv(ofd, serv_buf, sizeof(serv_buf), 0);
         if (n < 0) {
@@ -344,7 +322,6 @@ static void handle_client(void *arg) {
             cache_failed(entry);
             break;
         }
-
         if (n == 0) {
             log_debug("client fd=%d: origin closed connection, marking complete", cfd);
             cache_complete(entry);
@@ -352,31 +329,41 @@ static void handle_client(void *arg) {
         }
 
         if (cache_add(entry, serv_buf, (size_t)n, cache) != 0) {
-            log_error("client fd=%d: cache_append_data failed", cfd);
+            log_error("client fd=%d: cache_add failed", cfd);
             cache_failed(entry);
             break;
         }
 
-        if (send_all(cfd, serv_buf, (size_t)n) < 0) 
-            log_error("client fd=%d: send_all to client failed: %s", cfd, strerror(errno));
+        if (client_alive && send_all(cfd, serv_buf, (size_t)n) < 0) {
+            if (errno == EPIPE || errno == ECONNRESET) {
+                log_info("client fd=%d: closed connection while writing, continue caching", cfd);
+            } else {
+                log_error("client fd=%d: send_all to client failed: %s", cfd, strerror(errno));
+            }
+            client_alive = 0;
+        }
     }
-
     close(ofd);
-    close(cfd);
     cache_release(cache, entry);
+
+cleanup:
+    close(cfd);
+    free(ctx); 
     log_debug("client fd=%d: handler finished", cfd);
 }
-
 
 int proxy_run(const proxy_config_t *cfg) {
     signal(SIGPIPE, SIG_IGN);
 
     cache_table_t cache;
-    cache_table_init(&cache);
-
+    if (cache_table_init(&cache) != 0) {
+        log_error("failed to init cache table");
+        return 1;
+    }
     threadPool_t *pool = threadpoll_init(cfg->worker_count);
     if (!pool) {
         log_error("failed to create thread pool");
+        cache_table_destroy(&cache);
         return 1;
     }
 
@@ -384,6 +371,7 @@ int proxy_run(const proxy_config_t *cfg) {
     if (lfd < 0) {
         log_error("failed to create listen socket on port %d", cfg->listen_port);
         threadpool_stop(pool);
+        cache_table_destroy(&cache);
         return 1;
     }
 
@@ -422,6 +410,7 @@ int proxy_run(const proxy_config_t *cfg) {
 
     close(lfd);
     threadpool_stop(pool);
+    cache_table_destroy(&cache);
     log_info("proxy stopped");
     return 0;
 }
