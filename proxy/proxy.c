@@ -13,23 +13,31 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-typedef struct client_ctx 
-{
+typedef struct client_ctx {
     int client_fd;
     cache_table_t *cache;
 } client_ctx_t;
 
-static ssize_t send_all(int fd, const void *buf, size_t len) 
-{
+static void *gc_thread_loop(void *arg) {
+    cache_table_t *cache = (cache_table_t *)arg;
+    log_info("GC thread started");
+    
+    while (1) {
+        sleep(1); 
+        cache_evict_if_needed(cache);
+    }
+    return NULL;
+}
+
+static ssize_t send_all(int fd, const void *buf, size_t len) {
     const char *p = buf;
     size_t left   = len;
 
-    while (left > 0) 
-    {
+    while (left > 0) {
         ssize_t n = send(fd, p, left, 0);
-        if (n < 0) 
-        {
-            if (errno == EINTR) continue;
+        if (n < 0) {
+            if (errno == EINTR) 
+                continue;
             return -1;
         }
         if (n == 0) break;
@@ -360,6 +368,13 @@ int proxy_run(const proxy_config_t *cfg) {
         log_error("failed to init cache table");
         return 1;
     }
+    pthread_t gc_thread;
+    if (pthread_create(&gc_thread, NULL, gc_thread_loop, &cache) != 0) {
+        log_error("failed to create GC thread");
+        cache_table_destroy(&cache);
+        return 1;
+    }
+    pthread_detach(gc_thread);
     threadPool_t *pool = threadpoll_init(cfg->worker_count);
     if (!pool) {
         log_error("failed to create thread pool");

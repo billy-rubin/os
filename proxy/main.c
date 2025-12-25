@@ -13,7 +13,8 @@ int main(void) {
     log_info("starting proxy on port %d with %d workers", cfg.listen_port, cfg.worker_count);
 
     int rc = proxy_run(&cfg);
-    if (rc != 0) log_error("proxy failed with code %d", rc);
+    if (rc != 0) 
+        log_error("proxy failed with code %d", rc);
 
     logger_finalize();
     return rc;
