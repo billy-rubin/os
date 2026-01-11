@@ -5,7 +5,7 @@
 
 static void *workerLoop(void *arg);
 
-threadPool_t *threadpoll_init(int num_threads) {
+threadPool_t *threadpool_init(int num_threads) {
     if (num_threads <= 0) 
         return NULL;
     

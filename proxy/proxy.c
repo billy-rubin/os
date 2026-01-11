@@ -13,6 +13,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+static volatile int g_proxy_running = 1;
+
 typedef struct client_ctx {
     int client_fd;
     cache_table_t *cache;
@@ -22,9 +24,11 @@ static void *gc_thread_loop(void *arg) {
     cache_table_t *cache = (cache_table_t *)arg;
     log_info("GC thread started");
     
-    while (1) {
+    while (g_proxy_running) {
         sleep(1); 
-        cache_evict_if_needed(cache);
+        if (g_proxy_running) {
+            cache_evict_if_needed(cache);
+        }
     }
     return NULL;
 }
@@ -147,6 +151,11 @@ static void stream_from_cache(cache_entry_t *entry, int client_fd) {
         if (entry->failed) {
             pthread_mutex_unlock(&entry->lock);
             log_error("stream_from_cache: entry failed, stop streaming");
+            if (offset == 0) {
+                const char *err_msg = "HTTP/1.0 502 Bad Gateway\r\nConnection: close\r\nContent-Length: 0\r\n\r\n";
+                send_all(client_fd, err_msg, strlen(err_msg));
+                log_info("stream_from_cache: sent 502 to client fd=%d", client_fd);
+            }
             break;
         }
 
@@ -164,14 +173,13 @@ static void stream_from_cache(cache_entry_t *entry, int client_fd) {
         pthread_mutex_unlock(&entry->lock);
 
         if (send_all(client_fd, tmp, chunk) < 0) {
-            log_error("stream_from_cache: send_all to client fd=%d failed: %s", client_fd, strerror(errno));
             if (errno == EPIPE || errno == ECONNRESET) {
                 log_info("stream_from_cache: client fd=%d closed connection", client_fd);
-            } else {
-                log_error("stream_from_cache: send_all to client fd=%d failed: %s",
+           } else {
+                log_error("stream_from_cache: send_all to client fd=%d failed: %s", 
                           client_fd, strerror(errno));
-            }
-            break;
+           }
+           break;
         }
     }
 }
@@ -374,14 +382,12 @@ int proxy_run(const proxy_config_t *cfg) {
         cache_table_destroy(&cache);
         return 1;
     }
-    pthread_detach(gc_thread);
-    threadPool_t *pool = threadpoll_init(cfg->worker_count);
+    threadPool_t *pool = threadpool_init(cfg->worker_count);
     if (!pool) {
         log_error("failed to create thread pool");
         cache_table_destroy(&cache);
         return 1;
     }
-
     int lfd = create_listen_socket(cfg->listen_port);
     if (lfd < 0) {
         log_error("failed to create listen socket on port %d", cfg->listen_port);
@@ -424,6 +430,8 @@ int proxy_run(const proxy_config_t *cfg) {
     }
 
     close(lfd);
+    g_proxy_running = 0;
+    pthread_join(gc_thread, NULL);
     threadpool_stop(pool);
     cache_table_destroy(&cache);
     log_info("proxy stopped");

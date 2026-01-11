@@ -292,3 +292,29 @@
 [19:26:50] [DBG] stream_from_cache: finished for fd=6
 [19:26:50] [DBG] cache_release key='static.kremlin.ru /media/events/video/ru/video_high/LJmJ5nrjhyCfVNDigS1CHdlmaG15G8cR.mp4', refcnt=0
 [19:26:50] [DBG] client fd=6: handler finished
+[19:47:57] [DBG] cache table initialized
+[19:49:26] [DBG] cache table initialized
+[19:50:34] [DBG] cache table initialized
+[19:51:06] [DBG] cache table initialized
+[19:51:21] [DBG] cache table initialized
+[19:51:57] [DBG] cache table initialized
+[19:52:11] [DBG] cache table initialized
+[19:56:04] [DBG] cache table initialized
+[19:56:38] [DBG] cache table initialized
+[19:56:49] [DBG] accepted client fd=5
+[19:56:49] [DBG] client fd=5: handler started
+[19:56:49] [DBG] client fd=5: method=GET host=static.kremlin.ru uri=/media/events/video/ru/video_high/LJmJ5nrjhyCfVNDigS1CHdlmaG15G8cR.mp4
+[19:56:49] [DBG] cache MISS, new entry key='static.kremlin.ru /media/events/video/ru/video_high/LJmJ5nrjhyCfVNDigS1CHdlmaG15G8cR.mp4'
+[19:56:49] [DBG] client fd=5: key='static.kremlin.ru /media/events/video/ru/video_high/LJmJ5nrjhyCfVNDigS1CHdlmaG15G8cR.mp4', am_writer=1
+[19:56:49] [DBG] connected to origin static.kremlin.ru:80, fd=7
+[19:57:24] [DBG] client fd=5: origin closed connection, marking complete
+[19:57:24] [DBG] cache_complete for key='static.kremlin.ru /media/events/video/ru/video_high/LJmJ5nrjhyCfVNDigS1CHdlmaG15G8cR.mp4'
+[19:57:24] [DBG] cache_release key='static.kremlin.ru /media/events/video/ru/video_high/LJmJ5nrjhyCfVNDigS1CHdlmaG15G8cR.mp4', refcnt=0
+[19:57:24] [DBG] client fd=5: handler finished
+[19:59:11] [DBG] cache table initialized
+[19:59:26] [DBG] accepted client fd=5
+[19:59:26] [DBG] client fd=5: handler started
+[19:59:26] [DBG] client fd=5: method=GET host=static.kremlin.ru uri=/media/events/video/ru/video_high/LJmJ5nrjhyCfVNDigS1CHdlmaG15G8cR.mp4
+[19:59:26] [DBG] cache MISS, new entry key='static.kremlin.ru /media/events/video/ru/video_high/LJmJ5nrjhyCfVNDigS1CHdlmaG15G8cR.mp4'
+[19:59:26] [DBG] client fd=5: key='static.kremlin.ru /media/events/video/ru/video_high/LJmJ5nrjhyCfVNDigS1CHdlmaG15G8cR.mp4', am_writer=1
+[19:59:26] [DBG] connected to origin static.kremlin.ru:80, fd=7

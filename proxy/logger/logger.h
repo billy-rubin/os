@@ -3,10 +3,10 @@
 #include <stdio.h>
 
 typedef enum {
-    LOG_ERROR = 0,
+    LOG_DEBUG = 0,
     LOG_INFO  = 1,
-    LOG_DEBUG = 2,
-    LOG_WARN = 3,
+    LOG_WARN = 2,
+    LOG_ERROR = 3,
 } log_level_t;
 
 int  logger_init(log_level_t level);
