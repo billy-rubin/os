@@ -3,6 +3,7 @@
 #include <linux/futex.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include <errno.h>
 
 static int futex_wait(volatile int *addr, int expected) {
   return syscall(SYS_futex, (int *)addr, FUTEX_WAIT, expected, NULL, NULL, 0);
@@ -69,6 +70,8 @@ int fmutex_trylock(futex_mutex_t *m) {
   int expected = MUTEX_UNLOCKED;
   int desired = MUTEX_LOCKED;
 
-  return __atomic_compare_exchange(&m->state, &expected, &desired, 0,
-                                   __ATOMIC_ACQUIRE, __ATOMIC_RELAXED);
+  if (__atomic_compare_exchange(&m->state, &expected, &desired, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)) {
+      return 0;
+    }
+  return EBUSY;
 }
