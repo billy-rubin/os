@@ -2,7 +2,7 @@
 #define SPINLOCK_H
 
 typedef struct {
-    volatile int flag; 
+    int flag; 
 } spinlock_t;
 
 void spin_init(spinlock_t *lock);
