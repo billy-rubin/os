@@ -1,0 +1,14 @@
+# Compiled Object files
+*.o
+
+# Compiled Binary
+proxy
+
+# Log files
+*.log
+
+# VS Code settings
+.vscode/
+
+# System files
+.DS_Store
